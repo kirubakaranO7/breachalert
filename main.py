@@ -17,7 +17,7 @@ from pydantic import BaseModel
 app = FastAPI()
 
 HIBP_API_KEY = os.getenv("HIBP_API_KEY")
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = os.getenv("BASE_URL", "http://127.0.0.1:8000")
 DB_FILE = "breachalert.db"
 CACHE_HOURS = 24
 SMTP_HOST = os.getenv("SMTP_HOST")
@@ -250,6 +250,7 @@ def check_email(email: str):
 # TESTING ONLY: lets you run the nightly scan on demand.
 # We will protect or remove this in Week 4 (security).
 @app.post("/scan-now")
-def scan_now():
+def scan_now(key: str = ""):
+    if not key or key != os.getenv("ADMIN_KEY"): raise HTTPException(status_code=403, detail="Forbidden")
     count = scan_all()
     return {"message": f"Scanned {count} verified email(s). See the terminal."}
