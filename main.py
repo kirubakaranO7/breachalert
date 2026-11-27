@@ -60,7 +60,23 @@ def init_db():
 
 init_db()
 
+FREE_LIMIT = 1
+FAMILY_LIMIT = 5
+PLAN = os.getenv("PLAN", "free")
 
+
+def check_email_limit(email):
+    limit = FAMILY_LIMIT if PLAN == "family" else FREE_LIMIT
+    with get_db() as conn:
+        known = conn.execute(
+            "SELECT 1 FROM monitored_emails WHERE email = ?", (email,)
+        ).fetchone()
+        total = conn.execute("SELECT COUNT(*) FROM monitored_emails").fetchone()[0]
+    if not known and total >= limit:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Plan limit reached: the {PLAN} plan allows {limit} email(s).",
+        )
 class EmailIn(BaseModel):
     email: str
 
@@ -209,6 +225,7 @@ def add_email(data: EmailIn):
     if "@" not in email:
         raise HTTPException(status_code=400, detail="Invalid email")
     token = secrets.token_urlsafe(24)
+    check_email_limit(email)
     with get_db() as conn:
         row = conn.execute(
             "SELECT verified FROM monitored_emails WHERE email = ?", (email,)
