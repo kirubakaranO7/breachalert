@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BreachAlert</title>
+<style>
+body{font-family:Arial,sans-serif;max-width:700px;margin:30px auto;padding:0 16px;background:#f4f6f8}
+h1{color:#1a3c6e}
+.card{background:#fff;padding:16px;border-radius:8px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+input{padding:8px;width:55%}
+button{padding:8px 12px;cursor:pointer;margin-left:4px}
+.breach{border-left:4px solid #d9534f;padding:8px 12px;margin:10px 0;background:#fff5f5}
+.date{color:#666;font-size:13px;margin-left:8px}
+.tag{display:inline-block;background:#eee;border-radius:12px;padding:3px 10px;margin:4px 4px 0 0;font-size:13px}
+#msg{margin-top:10px}
+</style>
+</head>
+<body>
+<h1>🛡️ BreachAlert</h1>
+
+<div class="card">
+  <h3>Monitor an email</h3>
+  <input id="email" type="email" placeholder="you@example.com">
+  <button onclick="addEmail()">Add email</button>
+  <button onclick="checkEmail()">Check breaches</button>
+  <div id="msg"></div>
+</div>
+
+<div class="card">
+  <h3>Breach timeline</h3>
+  <div id="timeline">No results yet.</div>
+</div>
+<div class="card">
+  <h3>What to do next</h3>
+  <div id="advice">Run a check to see advice.</div>
+</div>
+
+<script>
+const ICONS = {
+  "Passwords": "🔑", "Email addresses": "📧", "Phone numbers": "📱",
+  "Credit cards": "💳", "Dates of birth": "🎂", "Physical addresses": "🏠",
+  "Names": "👤", "IP addresses": "🌐"
+};
+
+function show(text) {
+  document.getElementById("msg").textContent = text;
+}
+
+async function addEmail() {
+  const email = document.getElementById("email").value;
+  const res = await fetch("/emails", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({email: email})
+  });
+  const data = await res.json();
+  show(data.message || data.detail);
+}
+
+async function checkEmail() {
+  const email = document.getElementById("email").value;
+  const res = await fetch("/check/" + encodeURIComponent(email));
+  const data = await res.json();
+  if (!res.ok) { show(data.detail); return; }
+  show("Source: " + data.source + (data.cached ? " (cached, under 24h old)" : " (fresh)"));
+  const adv = document.getElementById("advice");
+  adv.textContent = "";
+  for (const tip of (data.advice || [])) {
+    const p = document.createElement("p");
+    p.textContent = "✅ " + tip;
+    adv.append(p);
+  }
+
+  const box = document.getElementById("timeline");
+  box.textContent = "";
+  if (data.breaches.length === 0) {
+    box.textContent = "Good news: no breaches found.";
+    return;
+  }
+  data.breaches.sort((a, b) => b.BreachDate.localeCompare(a.BreachDate));
+  for (const b of data.breaches) {
+    const item = document.createElement("div");
+    item.className = "breach";
+    const name = document.createElement("strong");
+    name.textContent = b.Name;
+    const date = document.createElement("span");
+    date.className = "date";
+    date.textContent = b.BreachDate;
+    item.append(name, date, document.createElement("br"));
+    for (const d of b.DataClasses) {
+      const tag = document.createElement("span");
+      tag.className = "tag";
+      tag.textContent = (ICONS[d] || "⚠️") + " " + d;
+      item.append(tag);
+    }
+    box.append(item);
+  }
+}
+</script>
+</body>
+</html>
